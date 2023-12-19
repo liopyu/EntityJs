@@ -10,6 +10,5 @@ public class EntityJSPlugin extends KubeJSPlugin {
     @Override
     public void registerEvents() {
         EntityJSEvent.GROUP.register();
-        EntityJSEvent.ENTITYREGISTRY.post(new EntityModificationEventJS());
     }
 }
