@@ -1,1 +1,1 @@
-net.liopyu.entityjs.EntityJSPlugin
+net.liopyu.mods.entityjs.EntityJSPlugin

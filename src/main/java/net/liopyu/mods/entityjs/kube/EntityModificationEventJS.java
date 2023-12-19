@@ -7,7 +7,5 @@ import net.minecraft.resources.ResourceLocation;
 public class EntityModificationEventJS extends EventJS {
     public EntityActionsBuilderJS create(ResourceLocation id) {
         return new EntityActionsBuilderJS();
-
-
     }
 }
