@@ -3,6 +3,7 @@ package net.liopyu.mods.entityjs;
 import net.liopyu.mods.entityjs.kube.EntityJSEvent;
 import net.liopyu.mods.entityjs.kube.EntityModificationEventJS;
 import net.minecraft.core.Registry;
+import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import net.minecraftforge.registries.RegisterEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -17,6 +18,8 @@ public class EntityJS {
 
     public EntityJS() {
         LOGGER.info("Loading EntityJS-Liopyu");
+        var modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
+        modEventBus.addListener(EntityJS::onEntityRegistry);
     }
 
     @SubscribeEvent
