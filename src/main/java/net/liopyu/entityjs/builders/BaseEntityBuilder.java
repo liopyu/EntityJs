@@ -1,14 +1,11 @@
 package net.liopyu.entityjs.builders;
 
-import dev.architectury.utils.value.FloatSupplier;
 import dev.latvian.mods.kubejs.registry.BuilderBase;
 import dev.latvian.mods.kubejs.registry.RegistryInfo;
 import dev.latvian.mods.kubejs.typings.Generics;
 import dev.latvian.mods.kubejs.typings.Info;
 import dev.latvian.mods.kubejs.typings.Param;
 import dev.latvian.mods.rhino.util.HideFromJS;
-import it.unimi.dsi.fastutil.booleans.BooleanConsumer;
-import it.unimi.dsi.fastutil.floats.FloatConsumer;
 import net.liopyu.entityjs.entities.BaseEntityJS;
 import net.liopyu.entityjs.entities.IAnimatableJS;
 import net.liopyu.entityjs.entities.MobEntityJS;
@@ -21,13 +18,10 @@ import net.minecraft.core.Direction;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.HoverEvent;
-import net.liopyu.entityjs.util.ai.brain.BrainBuilder;
-import net.liopyu.entityjs.util.ai.brain.BrainProviderBuilder;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
-import net.minecraft.util.RandomSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.damagesource.CombatTracker;
@@ -43,15 +37,19 @@ import net.minecraft.world.level.material.FluidState;
 import org.apache.commons.lang3.function.TriFunction;
 import org.jetbrains.annotations.Nullable;
 import net.minecraft.world.entity.ai.targeting.TargetingConditions;
+import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.level.portal.PortalInfo;
 import net.minecraft.world.level.storage.loot.LootContext;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.registries.ForgeRegistries;
 import org.apache.logging.log4j.util.TriConsumer;
+import org.jetbrains.annotations.Nullable;
 import software.bernie.geckolib3.core.PlayState;
 import software.bernie.geckolib3.core.builder.AnimationBuilder;
 import software.bernie.geckolib3.core.controller.AnimationController;
@@ -62,7 +60,9 @@ import software.bernie.geckolib3.core.event.ParticleKeyFrameEvent;
 import software.bernie.geckolib3.core.event.SoundKeyframeEvent;
 import software.bernie.geckolib3.core.event.predicate.AnimationEvent;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
 import java.util.function.*;
 
 /**
@@ -71,7 +71,7 @@ import java.util.function.*;
  * of these as they wish
  *
  * @param <T> The entity class that the built entity type is for, this should be a custom class
- *            that extends {@link LivingEntity} or a subclass and {@link IAnimatableJS}
+ *           that extends {@link LivingEntity} or a subclass and {@link IAnimatableJS}
  */
 @SuppressWarnings("unused")
 public abstract class BaseEntityBuilder<T extends LivingEntity & IAnimatableJS> extends BuilderBase<EntityType<T>> {
@@ -116,13 +116,10 @@ public abstract class BaseEntityBuilder<T extends LivingEntity & IAnimatableJS> 
     public transient SoundEvent getSwimHighSpeedSplashSound;
     public transient EntityType<?> getType;
     public transient AABB customBoundingBox;
-
-    public transient BrainProviderBuilder brainProviderBuilder;
+    public transient List<BlockState> shouldRemoveSoulSpeed;
     public transient HumanoidArm mainArm;
     public transient boolean hasInventory;
-    public transient Consumer<BrainBuilder> brainBuilder;
-
-    /*public transient Consumer<BaseEntityJS> dropExperienceHandler;*/
+    public transient Consumer<T> dropExperienceHandler;
     public transient boolean onSoulSpeedBlock;
 
     public transient Function<LootContext.Builder, LootContext.Builder> customLootContextBuilder;
@@ -225,7 +222,6 @@ public abstract class BaseEntityBuilder<T extends LivingEntity & IAnimatableJS> 
     public transient Function<MobEffect, MobEffectInstance> customGetEffect;*/
     public transient BiPredicate<MobEffectInstance, Entity> customAddEffect;
     public transient Predicate<MobEffectInstance> canBeAffectedPredicate;
-
 
     public transient BiConsumer<MobEffectInstance, @Nullable Entity> forceAddEffectConsumer;
 
@@ -487,7 +483,7 @@ public abstract class BaseEntityBuilder<T extends LivingEntity & IAnimatableJS> 
     @Info(value = """
             Sets how the model of the entity is determined, has access to the entity
             to allow changing the model based on info about the entity
-                        
+          
             Defaults to returning <namespace>:geo/<path>.geo.json
             """)
     public BaseEntityBuilder<T> modelResourceFunction(Function<T, ResourceLocation> function) {
@@ -498,7 +494,7 @@ public abstract class BaseEntityBuilder<T extends LivingEntity & IAnimatableJS> 
     @Info(value = """
             Sets how the texture of the entity is determined, has access to the entity
             to allow changing the texture based on info about the entity
-                        
+          
             Defaults to returning <namespace>:textures/model/entity/<path>.png
             """)
     public BaseEntityBuilder<T> textureResourceFunction(Function<T, ResourceLocation> function) {
@@ -509,7 +505,7 @@ public abstract class BaseEntityBuilder<T extends LivingEntity & IAnimatableJS> 
     @Info(value = """
             Sets how the animations of the entity is determined, has access to the entity
             to allow changing the animations based on info about the entity
-                        
+          
             Defaults to returning <namespace>:animations/<path>.animation.json
             """)
     public BaseEntityBuilder<T> animationResourceFunction(Function<T, ResourceLocation> function) {
@@ -1733,17 +1729,6 @@ public abstract class BaseEntityBuilder<T extends LivingEntity & IAnimatableJS> 
 
 
     //STUFF
-    public BaseEntityBuilder<T> brainProvider(Consumer<BrainProviderBuilder> brainProvider) {
-        brainProviderBuilder = new BrainProviderBuilder(id);
-        brainProvider.accept(brainProviderBuilder);
-        // ConsoleJS.STARTUP.error(brainProviderBuilder);
-        return this;
-    }
-
-    public BaseEntityBuilder<T> brainBuilder(Consumer<BrainBuilder> brainBuilder) {
-        this.brainBuilder = brainBuilder;
-        return this;
-    }
 
     @Info(value = "Adds a new AnimationController to the entity", params = {
             @Param(name = "name", value = "The name of the controller"),
@@ -1772,7 +1757,7 @@ public abstract class BaseEntityBuilder<T extends LivingEntity & IAnimatableJS> 
             @Nullable IParticleListenerJS<T> particleListener,
             @Nullable ICustomInstructionListenerJS<T> instructionListener
     ) {
-        animationSuppliers.add(new AnimationControllerSupplier<>(name, translationTicksLength, easingType, predicate, soundListener, particleListener, instructionListener));
+        animationSuppliers.add(new AnimationControllerSupplier<>(name,translationTicksLength, easingType, predicate, soundListener, particleListener, instructionListener));
         return this;
     }
 
@@ -1788,7 +1773,6 @@ public abstract class BaseEntityBuilder<T extends LivingEntity & IAnimatableJS> 
 
     /**
      * <strong>Do not</strong> override unless you are creating a custom entity type builder<br><br>
-     * <p>
      * See: {@link #factory()}
      */
     @Override
@@ -1800,7 +1784,7 @@ public abstract class BaseEntityBuilder<T extends LivingEntity & IAnimatableJS> 
      * This is the method which should be overrriden to create new type, a typical implementation looks like
      * {@code (type, level) -> new <CustomEntityClass>(this, type, level)}. See {@link BaseEntityJSBuilder#factory()}
      * and {@link BaseEntityJS} for examples.<br><br>
-     * <p>
+     * 
      * Unlike most builder types, there is little need to override {@link #createObject()} due to entity types being
      * essentially a supplier for the class.
      *
@@ -1960,7 +1944,7 @@ public abstract class BaseEntityBuilder<T extends LivingEntity & IAnimatableJS> 
     public interface ISoundListenerJS<E extends LivingEntity & IAnimatableJS> {
         void playSound(SoundKeyFrameEventJS<E> event);
     }
-
+              
     public static class SoundKeyFrameEventJS<E extends LivingEntity & IAnimatableJS> extends KeyFrameEventJS<E> {
 
         @Info(value = "The name of the sound to play")
